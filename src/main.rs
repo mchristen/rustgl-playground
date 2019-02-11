@@ -1,3 +1,5 @@
+pub mod resources;
+
 extern crate gl;
 extern crate glutin;
 #[macro_use]
@@ -5,12 +7,15 @@ extern crate slog;
 extern crate slog_term;
 extern crate slog_async;
 
+use std::path::Path;
 use std::collections::VecDeque;
 use std::collections::HashMap;
 use std::ffi::{CString, CStr};
 use glutin::dpi::*;
 use glutin::GlContext;
 use slog::Drain;
+
+use resources::Resources;
 
 fn get_cstring_with_len(len: usize) -> CString {
     let mut buffer:Vec<u8> = Vec::with_capacity(len as usize + 1);
@@ -33,6 +38,23 @@ impl Drop for Shader {
 }
 
 impl Shader {
+    fn from_res(gl: &gl::Gl, resources: &Resources, name: &str) -> Result<Shader, String> {
+        const POSSIBLE_EXT: [(&str, gl::types::GLenum); 2] = [
+            (".vert", gl::VERTEX_SHADER),
+            (".frag", gl::FRAGMENT_SHADER),
+        ];
+        let shader_kind = POSSIBLE_EXT.iter()
+            .find(|&&(file_extension, _)| {
+                name.ends_with(file_extension)
+            })
+            .map(|&(_, kind)| kind)
+            .ok_or_else(|| format!("Can not determine shader type for resource {:?}", name))?;
+
+        let source = resources.load_cstring(name)
+            .map_err(|e| format!("Error loading resource {:?}: {:?}", name, e))?;
+
+        Shader::from_source(gl, &source, shader_kind)
+    }
 
     fn from_source(gl: &gl::Gl, source: &CStr, kind: gl::types::GLenum) -> Result<Shader, String> {
         let id = unsafe { gl.CreateShader(kind) };
@@ -69,6 +91,19 @@ struct Program {
 }
 
 impl Program {
+    fn from_res(gl: &gl::Gl, resources: &Resources, name: &str) -> Result<Box<Program>, String> {
+        const POSSIBLE_EXT: [&str; 2] = [
+            ".vert",
+            ".frag",
+        ];
+        let shaders = POSSIBLE_EXT.iter()
+            .map(|file_extension| {
+                Shader::from_res(gl, resources, &format!("{}{}", name, file_extension))
+            }).collect::<Result<Vec<Shader>, String>>()?;
+
+        Program::from_shaders(gl, &shaders[..])
+
+    }
     fn from_shaders(gl: &gl::Gl, shaders: &[Shader]) -> Result<Box<Program>, String> {
         let id = unsafe { gl.CreateProgram() };
         for shader in shaders {
@@ -208,18 +243,11 @@ struct Game<'a> {
 
 impl<'a> Game<'a> {
 
-    fn new(gl: &gl::Gl, gl_window: &'a glutin::GlWindow, event_loop: &'a mut glutin::EventsLoop, log: &'a slog::Logger) -> Box<Game<'a>>  {
+    fn new(gl: &gl::Gl, resources: &Resources, gl_window: &'a glutin::GlWindow, event_loop: &'a mut glutin::EventsLoop, log: &'a slog::Logger) -> Box<Game<'a>>  {
 
         info!(log, "Creating new Game Engine");;
 
-        let v_src = include_str!("triangle_test.vert");
-        let f_src = include_str!("triangle_test.frag");
-        trace!(log, "Loading vertex shader source {}", v_src);
-        trace!(log, "Loading fragment shader source {}", f_src);
-        let v = Shader::from_source(gl, &CString::new(v_src).unwrap(), gl::VERTEX_SHADER).unwrap();
-        let h = Shader::from_source(gl, &CString::new(f_src).unwrap(), gl::FRAGMENT_SHADER).unwrap();
-
-        let triangle = Program::from_shaders(gl, &[v,h]).unwrap();
+        let triangle = Program::from_res(gl, resources, "shaders/triangle_test").unwrap();
         let mut test_scene = Scene::with_program(gl, &triangle);
         let mut programs = HashMap::new();
         programs.insert(triangle.id, triangle);
@@ -335,7 +363,9 @@ fn main() {
         // gl::Enable(gl::BLEND);
         //gl::BlendFunc(gl::SRC_ALPHA, gl::SRC_COLOR);
     }
-    let mut game = Game::new(&gl, &gl_window, &mut event_loop, &log);
+    let resources = Resources::from_relative_exe(Path::new("assets")).unwrap();
+    println!("Resource path: {:?}", resources.root());
+    let mut game = Game::new(&gl, &resources, &gl_window, &mut event_loop, &log);
     game.run();
 
 }

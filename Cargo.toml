@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Matthew Christen"]
 edition = "2018"
 
+[build-dependencies]
+walkdir = "2.2.7"
+
 [dependencies]
 gl = { path = "./lib/gl" }
 winit = "0.18.1"
