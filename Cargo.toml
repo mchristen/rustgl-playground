@@ -1,10 +1,13 @@
 [package]
 name = "rustgl"
 version = "0.1.0"
-authors = ["Matt"]
+authors = ["Matthew Christen"]
 edition = "2018"
 
 [dependencies]
 gl = "0.11.0"
 winit = "0.18.1"
 glutin = "0.19.0"
+slog = { version = "2.4.1", features = ["max_level_trace", "release_max_level_warn"] }
+slog-term = "2.4.0"
+slog-async = "2.3.0"
