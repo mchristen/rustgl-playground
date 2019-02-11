@@ -18,83 +18,79 @@ fn get_cstring_with_len(len: usize) -> CString {
     return unsafe { CString::from_vec_unchecked(buffer)};
 }
 
-fn load_shader(source: &CStr, shader_type: gl::types::GLuint) -> Result<gl::types::GLuint, String> {
-
-    let id = unsafe { gl::CreateShader(shader_type) };
-    let mut result: gl::types::GLint = 1;
-    unsafe {
-        gl::ShaderSource(id, 1, &source.as_ptr(), std::ptr::null());
-        gl::CompileShader(id);
-    }
-    unsafe {
-        gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut result);
-    }
-    println!("{}", result);
-    if result == 0 {
-        let mut len: gl::types::GLint = 0;
-        unsafe {
-            gl::GetShaderiv(id, gl::INFO_LOG_LENGTH, &mut len);
-        }
-        let error = get_cstring_with_len(len as usize);
-        unsafe {
-            gl::GetShaderInfoLog(id, len, std::ptr::null_mut(), error.as_ptr() as *mut gl::types::GLchar);
-        }
-        return Err(error.to_string_lossy().into_owned());
-    }
-    return Ok(id);
-}
-
 struct Shader {
     id: gl::types::GLuint,
+    gl: gl::Gl,
 }
 
 impl Drop for Shader {
 
     fn drop(&mut self) {
         unsafe {
-            gl::DeleteShader(self.id);
+            self.gl.DeleteShader(self.id);
         }
     }
 }
 
 impl Shader {
 
-    fn from_source(source: &CStr, kind: gl::types::GLenum) -> Result<Shader, String> {
-        let id = load_shader(source, kind)?;
-        return Ok(Shader { id });
+    fn from_source(gl: &gl::Gl, source: &CStr, kind: gl::types::GLenum) -> Result<Shader, String> {
+        let id = unsafe { gl.CreateShader(kind) };
+        let mut result: gl::types::GLint = 1;
+        unsafe {
+            gl.ShaderSource(id, 1, &source.as_ptr(), std::ptr::null());
+            gl.CompileShader(id);
+        }
+        unsafe {
+            gl.GetShaderiv(id, gl::COMPILE_STATUS, &mut result);
+        }
+        println!("{}", result);
+        if result == 0 {
+            let mut len: gl::types::GLint = 0;
+            unsafe {
+                gl.GetShaderiv(id, gl::INFO_LOG_LENGTH, &mut len);
+            }
+            let error = get_cstring_with_len(len as usize);
+            unsafe {
+                gl.GetShaderInfoLog(id, len, std::ptr::null_mut(), error.as_ptr() as *mut gl::types::GLchar);
+            }
+            return Err(error.to_string_lossy().into_owned());
+        }
+        return Ok(Shader { id: id, gl: gl.clone() });
     }
     fn id(&self) -> gl::types::GLuint {
         return self.id;
     }
 }
-#[derive(Clone, Debug)]
+
 struct Program {
     id: gl::types::GLuint,
+    gl: gl::Gl,
 }
 
 impl Program {
-    fn from_shaders(shaders: &[Shader]) -> Result<Box<Program>, String> {
-        let id = unsafe { gl::CreateProgram() };
+    fn from_shaders(gl: &gl::Gl, shaders: &[Shader]) -> Result<Box<Program>, String> {
+        let id = unsafe { gl.CreateProgram() };
         for shader in shaders {
             println!("attaching shader id: {}", shader.id());
             unsafe {
-                gl::AttachShader(id, shader.id());
+                gl.AttachShader(id, shader.id());
             }
         }
         let mut result: gl::types::GLint = 1;
         unsafe {
-            gl::LinkProgram(id);
-            gl::GetProgramiv(id, gl::LINK_STATUS, &mut result);
+            gl.LinkProgram(id);
+            gl.GetProgramiv(id, gl::LINK_STATUS, &mut result);
         }
 
         if result == 0 {
             let mut len: gl::types::GLint = 0;
             unsafe {
-                gl::GetProgramiv(id, gl::INFO_LOG_LENGTH, &mut len);
+                gl.GetProgramiv(id, gl::INFO_LOG_LENGTH, &mut len);
             }
             let error = get_cstring_with_len(len as usize);
             unsafe {
-                gl::GetProgramInfoLog(id, len, std::ptr::null_mut(), error.as_ptr() as *mut gl::types::GLchar);
+                gl.GetProgramInfoLog(id, len, std::ptr::null_mut(), error.as_ptr() as *mut gl::types::GLchar);
             }
             return Err(error.to_string_lossy().into_owned());
         }
@@ -102,15 +98,15 @@ impl Program {
 
         for shader in shaders {
             unsafe {
-                gl::DetachShader(id, shader.id());
+                gl.DetachShader(id, shader.id());
             }
         }
-        return Ok(Box::new(Program { id: id}));
+        return Ok(Box::new(Program { id: id, gl: gl.clone()}));
     }
 
     fn activate(&self) {
         unsafe {
-            gl::UseProgram(self.id);
+            self.gl.UseProgram(self.id);
         }
     }
 }
@@ -120,7 +116,7 @@ impl Drop for Program {
     fn drop(&mut self) {
         unsafe {
             println!("Deleting program {}", self.id);
-            gl::DeleteProgram(self.id);
+            self.gl.DeleteProgram(self.id);
         }
     }
 }
@@ -130,10 +126,11 @@ struct Scene {
     vertices: Vec<f32>,
     vbo_id: gl::types::GLuint,
     vao_id: gl::types::GLuint,
+    gl: gl::Gl,
 }
 
 impl Scene {
-    fn with_program(program: &Program) -> Box<Scene> {
+    fn with_program(gl: &gl::Gl, program: &Program) -> Box<Scene> {
         let vertices: Vec<f32> = vec![
             -0.5, -0.5, 0.0, 1.0, 0.0, 0.0,
             0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
@@ -143,25 +140,25 @@ impl Scene {
         let mut b_id: gl::types::GLuint = 0;
         let mut a_id: gl::types::GLuint = 0;
         unsafe {
-            gl::GenBuffers(1, &mut b_id);
+            gl.GenBuffers(1, &mut b_id);
         }
         unsafe {
-            gl::BindBuffer(gl::ARRAY_BUFFER, b_id);
-            gl::BufferData(
+            gl.BindBuffer(gl::ARRAY_BUFFER, b_id);
+            gl.BufferData(
                 gl::ARRAY_BUFFER,
                 (vertices.len() * std::mem::size_of::<f32>()) as gl::types::GLsizeiptr,
                 vertices.as_ptr() as *const gl::types::GLvoid,
                 gl::STATIC_DRAW
             );
-            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
-            gl::GenVertexArrays(1, &mut a_id);
+            gl.BindBuffer(gl::ARRAY_BUFFER, 0);
+            gl.GenVertexArrays(1, &mut a_id);
         }
         
         unsafe {
-            gl::BindVertexArray(a_id);
-            gl::BindBuffer(gl::ARRAY_BUFFER, b_id);
-            gl::EnableVertexAttribArray(0);
-            gl::VertexAttribPointer(
+            gl.BindVertexArray(a_id);
+            gl.BindBuffer(gl::ARRAY_BUFFER, b_id);
+            gl.EnableVertexAttribArray(0);
+            gl.VertexAttribPointer(
                 0,
                 3,
                 gl::FLOAT,
@@ -169,8 +166,8 @@ impl Scene {
                 (6 * std::mem::size_of::<f32>()) as gl::types::GLint,
                 std::ptr::null()
             );
-            gl::EnableVertexAttribArray(1);
-            gl::VertexAttribPointer(
+            gl.EnableVertexAttribArray(1);
+            gl.VertexAttribPointer(
                 1,
                 3,
                 gl::FLOAT,
@@ -178,17 +175,17 @@ impl Scene {
                 (6 * std::mem::size_of::<f32>()) as gl::types::GLint,
                 (3 * std::mem::size_of::<f32>()) as *const gl::types::GLvoid
             );
-            gl::BindVertexArray(0);
-            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+            gl.BindVertexArray(0);
+            gl.BindBuffer(gl::ARRAY_BUFFER, 0);
         }
 
-        return Box::new(Scene { program_id: program.id, vertices: vertices, vbo_id: b_id, vao_id: a_id });
+        return Box::new(Scene { gl: gl.clone(), program_id: program.id, vertices: vertices, vbo_id: b_id, vao_id: a_id });
     }
 
     fn draw(&self) {
         unsafe {
-            gl::BindVertexArray(self.vao_id);
-            gl::DrawArrays(
+            self.gl.BindVertexArray(self.vao_id);
+            self.gl.DrawArrays(
                 gl::TRIANGLES,
                 0,
                 3
@@ -206,35 +203,24 @@ struct Game<'a> {
     scenes: Vec<Box<Scene>>,
     programs: HashMap<gl::types::GLuint, Box<Program>>,
     log: slog::Logger,
+    gl: gl::Gl,
 }
 
 impl<'a> Game<'a> {
 
-    fn new(gl_window: &'a glutin::GlWindow, event_loop: &'a mut glutin::EventsLoop, log: &'a slog::Logger) -> Box<Game<'a>>  {
+    fn new(gl: &gl::Gl, gl_window: &'a glutin::GlWindow, event_loop: &'a mut glutin::EventsLoop, log: &'a slog::Logger) -> Box<Game<'a>>  {
 
         info!(log, "Creating new Game Engine");;
-        gl_window.show();
-        unsafe {
-            gl_window.make_current().unwrap();
-            gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
-            let data = CStr::from_ptr(gl::GetString(gl::VERSION) as *const _).to_bytes().to_vec();
-            let version = String::from_utf8(data).unwrap();
-            info!(log, "OpenGL Version {}", version);
-            gl::Viewport(0,0,1024,768);
-            gl::ClearColor(0.3, 0.3, 0.5, 1.0);
-           // gl::Enable(gl::BLEND);
-            //gl::BlendFunc(gl::SRC_ALPHA, gl::SRC_COLOR);
-        }
 
         let v_src = include_str!("triangle_test.vert");
         let f_src = include_str!("triangle_test.frag");
         trace!(log, "Loading vertex shader source {}", v_src);
         trace!(log, "Loading fragment shader source {}", f_src);
-        let v = Shader::from_source(&CString::new(v_src).unwrap(), gl::VERTEX_SHADER).unwrap();
-        let h = Shader::from_source(&CString::new(f_src).unwrap(), gl::FRAGMENT_SHADER).unwrap();
+        let v = Shader::from_source(gl, &CString::new(v_src).unwrap(), gl::VERTEX_SHADER).unwrap();
+        let h = Shader::from_source(gl, &CString::new(f_src).unwrap(), gl::FRAGMENT_SHADER).unwrap();
 
-        let triangle = Program::from_shaders(&[v,h]).unwrap();
-        let mut test_scene = Scene::with_program(&triangle);
+        let triangle = Program::from_shaders(gl, &[v,h]).unwrap();
+        let mut test_scene = Scene::with_program(gl, &triangle);
         let mut programs = HashMap::new();
         programs.insert(triangle.id, triangle);
         let log = log.new(o!("module" => "game"));
@@ -246,6 +232,7 @@ impl<'a> Game<'a> {
             scenes: vec!(test_scene),
             programs: programs,
             log: log,
+            gl: gl.clone(),
             });
 
         return game;
@@ -264,7 +251,7 @@ impl<'a> Game<'a> {
                 println!("Key Pressed: {:?}", key_press);
             }
             unsafe {
-                gl::Clear(gl::COLOR_BUFFER_BIT);
+                self.gl.Clear(gl::COLOR_BUFFER_BIT);
             }
             for scene in &self.scenes {
                 let program = self.programs.get(&scene.program_id).unwrap();
@@ -301,7 +288,7 @@ impl<'a> Game<'a> {
             },
             Resized(LogicalSize { width, height }) => {
                 unsafe {
-                    gl::Viewport(0,0, *width as i32, *height as i32);
+                    self.gl.Viewport(0,0, *width as i32, *height as i32);
                 }
                 println!("The window was resized to {}x{}", width, height);
             },
@@ -332,7 +319,23 @@ fn main() {
     let builder = glutin::WindowBuilder::new();
     let context = glutin::ContextBuilder::new().with_vsync(true).with_gl(glutin::GlRequest::Latest);
     let gl_window = glutin::GlWindow::new(builder, context, &event_loop).unwrap();
-    let mut game = Game::new(&gl_window, &mut event_loop, &log);
+    gl_window.show();
+    unsafe {
+        gl_window.make_current().unwrap();
+    }
+
+    let gl = gl::Gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
+    let data = unsafe { CStr::from_ptr(gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec() };
+
+    let version = String::from_utf8(data).unwrap();
+    info!(log, "OpenGL Version {}", version);
+    unsafe {
+        gl.Viewport(0,0,1024,768);
+        gl.ClearColor(0.3, 0.3, 0.5, 1.0);
+        // gl::Enable(gl::BLEND);
+        //gl::BlendFunc(gl::SRC_ALPHA, gl::SRC_COLOR);
+    }
+    let mut game = Game::new(&gl, &gl_window, &mut event_loop, &log);
     game.run();
 
 }
