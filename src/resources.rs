@@ -5,10 +5,15 @@ use std::ffi;
 
 use std::path::{Path, PathBuf};
 
-#[derive(Debug)]
+use failure::Fail;
+
+#[derive(Debug, Fail)]
 pub enum Error {
-    Io(io::Error),
+    #[fail(display = "I/O Error")]
+    Io(#[cause] io::Error),
+    #[fail(display = "File is malformed(containes a null byte)")]
     MalformedFile,
+    #[fail(display = "Path lookup failed")]
     NoExePath,
 }
 
