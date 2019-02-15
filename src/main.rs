@@ -9,6 +9,7 @@ use std::ffi::{CStr};
 use glutin::GlContext;
 use slog::Drain;
 use slog::info;
+use slog::debug;
 use slog::o;
 
 use resources::Resources;
@@ -34,19 +35,14 @@ fn main() {
 
     let version = String::from_utf8(data).unwrap();
     info!(log, "OpenGL Version {}", version);
-    unsafe {
-        gl.Viewport(0,0,1024,768);
-        gl.ClearColor(0.3, 0.3, 0.5, 1.0);
-        // gl::Enable(gl::BLEND);
-        //gl::BlendFunc(gl::SRC_ALPHA, gl::SRC_COLOR);
-    }
     let resources = Resources::from_relative_exe(Path::new("assets")).unwrap();
-    println!("Resource path: {:?}", resources.root());
-    let mut game = Game::new(&gl, &resources, &gl_window, &mut event_loop, &log);
+    debug!(log, "Resource path: {:?}", resources.root());
+    let mut game = Game::new(&gl, &resources, &gl_window, &mut event_loop, &log).unwrap();
     if let Err(e) = game.run() {
         println!("{}", failure_to_string(e));
     }
 
+    info!(log, "Okay then, goodbye.");
 }
 
 pub fn failure_to_string(e: failure::Error) -> String {
