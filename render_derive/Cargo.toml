@@ -1,0 +1,15 @@
+
+[package]
+name = "rustgl_render_derive"
+version = "0.1.0"
+authors = ["Matthew Christen"]
+edition = "2018"
+
+
+[dependencies]
+quote = "0.6.11"
+syn = "0.15.26"
+proc-macro2 = "0.4.27"
+
+[lib]
+proc-macro = true

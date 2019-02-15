@@ -1,6 +1,8 @@
+extern crate rustgl_render_derive;
+
 pub mod resources;
-pub mod render;
 pub mod game;
+pub mod render;
 
 use std::path::Path;
 use std::ffi::{CStr};
