@@ -12,6 +12,7 @@ use nalgebra;
 use scenes::Scene;
 use crate::render::viewport::Viewport;
 use crate::render::color_buffer::ColorBuffer;
+use crate::render::font::Font;
 
 pub struct Game<'a> {
 
@@ -25,6 +26,7 @@ pub struct Game<'a> {
     gl: gl::Gl,
     viewport: Viewport,
     color_buffer: ColorBuffer,
+    font: Font,
 }
 
 impl<'a> Game<'a> {
@@ -60,6 +62,7 @@ impl<'a> Game<'a> {
             gl: gl.clone(),
             viewport: Viewport::from_dimensions(width as i32, height as i32, dpi),
             color_buffer: ColorBuffer::from_color(nalgebra::Vector3::new(0.3, 0.3, 0.5)),
+            font: Font::from_resource(gl, resources, "fonts/DigitalDream.ttf"),
             });
 
         return Ok(game);

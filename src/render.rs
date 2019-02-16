@@ -4,3 +4,4 @@ pub mod vertex;
 pub mod array_buffer;
 pub mod viewport;
 pub mod color_buffer;
+pub mod font;

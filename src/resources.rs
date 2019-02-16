@@ -6,6 +6,9 @@ use std::ffi;
 use std::path::{Path, PathBuf};
 
 use failure::Fail;
+use font_kit::font::Font;
+use font_kit::file_type::FileType;
+use font_kit::handle::Handle;
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -37,6 +40,28 @@ impl Resources {
         Ok(Resources {
             root: exe_path.join(path)
         })
+    }
+
+    pub fn load_font(&self, resource_name: &str) -> Result<Vec<Font>, Error> {
+        let mut font_handles = vec!();
+        let normalized_path = normalize_resource_path(&self.root, resource_name);
+        println!("{:?}", normalized_path);
+
+        let mut file = fs::File::open(normalized_path.to_owned())?;
+        match Font::analyze_file(&mut file) {
+            Err(_) => panic!("Error loading font file from path: {:?}", normalized_path.to_owned()),
+            Ok(FileType::Single) => font_handles.push(Handle::from_path(normalized_path.to_owned(), 0)),
+            Ok(FileType::Collection(font_count)) => {
+                for font_index in 0..font_count {
+                    font_handles.push(Handle::from_path(normalized_path.to_owned(), font_index))
+                }
+            }
+        }
+        let mut fonts = vec!();
+        for handle in &font_handles {
+            fonts.push(Font::from_handle(&handle).unwrap());
+        }
+        Ok(fonts)
     }
     
     pub fn load_cstring(&self, resource_name: &str) -> Result<ffi::CString, Error> {
