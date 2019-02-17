@@ -41,6 +41,7 @@ impl<'a> Game<'a> {
         programs.insert(triangle.id(), triangle);
         let dpi = gl_window.get_hidpi_factor();
         let log = log.new(o!("module" => "game"));
+        let font_log = log.new(o!("sub_module" => "fonts"));
         let size = gl_window.get_inner_size().unwrap();
         let physical_size = size.to_physical(dpi);
         let mut width: u32 = 0;
@@ -62,7 +63,7 @@ impl<'a> Game<'a> {
             gl: gl.clone(),
             viewport: Viewport::from_dimensions(width as i32, height as i32, dpi),
             color_buffer: ColorBuffer::from_color(nalgebra::Vector3::new(0.3, 0.3, 0.5)),
-            font: Font::from_resource(gl, resources, "fonts/DigitalDream.ttf"),
+            font: Font::from_resource(gl, resources, "fonts/DigitalDream.ttf", 32.0, &font_log),
             });
 
         return Ok(game);
