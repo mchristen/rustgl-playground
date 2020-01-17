@@ -9,10 +9,10 @@ use slog::{info, debug, trace, warn, error};
 use slog::o;
 use nalgebra;
 
-use scenes::Scene;
 use crate::render::viewport::Viewport;
 use crate::render::color_buffer::ColorBuffer;
 use crate::render::font::Font;
+use scenes::Scene;
 
 pub struct Game<'a> {
 
